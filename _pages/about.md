@@ -2,16 +2,13 @@
 layout: about
 title: about
 permalink: /
-subtitle: Reinforcement learning · self-supervised representation learning · transformers.
+subtitle:
 
 profile:
   align: right
-  image: # no static photo — the training curve below stands in for it
+  image: # Mario gameplay GIF added once a completing-run clip is rendered
   image_circular: false
-  more_info: >
-    <img src="/assets/img/blog/curves/dqn_vs_ppo.png" alt="DQN vs PPO sample-efficiency on Super Mario Bros"
-         style="width:100%; border-radius:8px;" />
-    <p style="text-align:center; font-size:0.8em; margin-top:0.4em;">DQN vs PPO on Mario 1-1 — sample efficiency.</p>
+  more_info:
 
 selected_papers: false # includes a list of papers marked as "selected={true}"
 social: true # includes social icons at the bottom of the page
@@ -27,29 +24,10 @@ latest_posts:
   limit: 3 # leave blank to include all the blog posts
 ---
 
-**I build agentic-AI systems professionally; on my own time I implement reinforcement
-learning from scratch to understand *why* it works — then write up what I learn.**
-
-This started as a way to actually build the ideas I first met in a self-supervised-learning
-seminar at Mila, during my master's in Montréal. Back then my Python wasn't up to it — I could
-follow the papers but not run them. So I set out to build a small RL *factory*: infrastructure
-clean enough to reproduce those papers for real, starting with the curiosity work (ICM, RND) I
-most wanted to redo. Now the factory is my vehicle for testing research ideas — implement the
-paper, run the matched experiment, keep the honest negative results.
-
-The through-line is **exploration and representation**: teaching an agent to be curious
-(ICM, RND, episodic novelty), then asking the deeper question of *what space* novelty
-should even be measured in — which leads into self-supervised trajectory models and
-transformers that learn the environment's structure on purpose.
-
-The [blog](/blog/) is the main event: tutorial-style write-ups, each aiming to be
-readable by someone one course into deep learning, with every term defined the first
-time it appears.
-
 ### Start here — the RL-from-scratch series
 
-The current series builds a Mario agent from scratch, each model earning its place by
-fixing a limitation of the last, all sharing one small framework:
+The series builds a Mario agent from scratch, each model earning its place by fixing a
+limitation of the last, all sharing one small framework:
 
 1. [**rl-factory**](/blog/2026/rl-factory/) — the engine: where adding an algorithm is registering a learner, not rewriting a training loop.
 2. [**DQN**](/blog/2026/dqn/) — off-policy value learning; beat the random floor.
@@ -60,7 +38,21 @@ fixing a limitation of the last, all sharing one small framework:
 
 Or browse the whole [series](/blog/category/rl-from-scratch/).
 
-The code lives in two repos: [**rl-factory**]({{ site.factory_repo }}) — the
-environment-agnostic training engine — and [**rl-ablations**]({{ site.ablations_repo }}) —
-the five models (DQN, PPO, ICM, RND, kNN) that plug into it.
+### rl-factory — the engine
 
+[**rl-factory**]({{ site.factory_repo }}) is a lean, **environment-agnostic** RL training
+engine. A single `Trainer` owns only the shared concerns — the env-step budget, checkpointing,
+and logging — and drives a pluggable `TrainStrategy` (`setup / step / weights / teardown`).
+Models register themselves by name, and whether one is on- or off-policy is **data, not code**,
+so there's no per-algorithm branching in the loop. The design goal in one line: **adding a new
+RL algorithm is registering a learner, not rewriting a training loop.** It knows nothing about
+any specific algorithm or environment — those are supplied by a consumer.
+
+### rl-ablations — the experiments
+
+[**rl-ablations**]({{ site.ablations_repo }}) is the *what* to rl-factory's *how*: five
+algorithms — **DQN, PPO, ICM, RND, and kNN episodic novelty** — reproduced on **Super Mario
+Bros** (World 1-1) and plugged into the engine. The nice part is how little each one costs:
+ICM, RND, and kNN all **act with the PPO policy** and differ only in their learner, so a new
+model is a small drop-in rather than a new training loop. The write-ups above walk through them
+one at a time, with the Mario 1-1 comparison curves.
