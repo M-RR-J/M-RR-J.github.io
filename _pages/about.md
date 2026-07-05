@@ -41,7 +41,7 @@ limitation of the last, all sharing one small framework:
 
 Or browse the whole [series](/blog/category/rl-from-scratch/).
 
-### rl-factory — the engine
+### [rl-factory — the engine]({{ site.factory_repo }})
 
 [**rl-factory**]({{ site.factory_repo }}) is a lean, **environment-agnostic** RL training
 engine. A single `Trainer` owns only the shared concerns — the env-step budget, checkpointing,
@@ -51,7 +51,7 @@ so there's no per-algorithm branching in the loop. The design goal in one line: 
 RL algorithm is registering a learner, not rewriting a training loop.** It knows nothing about
 any specific algorithm or environment — those are supplied by a consumer.
 
-### rl-ablations — the experiments
+### [rl-ablations — the experiments]({{ site.ablations_repo }})
 
 [**rl-ablations**]({{ site.ablations_repo }}) is the *what* to rl-factory's *how*: five
 algorithms — **DQN, PPO, ICM, RND, and kNN episodic novelty** — reproduced on **Super Mario
