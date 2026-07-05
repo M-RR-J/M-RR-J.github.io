@@ -56,3 +56,30 @@ Bros** (World 1-1) and plugged into the engine. The nice part is how little each
 ICM, RND, and kNN all **act with the PPO policy** and differ only in their learner, so a new
 model is a small drop-in rather than a new training loop. The write-ups above walk through them
 one at a time, with the Mario 1-1 comparison curves.
+
+### why this exists
+
+Years ago, in a self-supervised-learning seminar at Mila, I met a stack of RL papers I wanted to
+*build*, not just read. Back then, one paper was about the ceiling — the limits were real and
+ordinary ones: a GPU budget, and code I was still growing into.
+
+What's changed is throughput. With the factory carrying the shared work — and an agent helping me
+build it — implementing a paper stops being a one-off project and becomes a drop-in. At Mila I
+could take one paper to a working implementation; now I can take ten. This series is me going back
+to those ideas and building them for real at that new pace — starting with the curiosity work
+(ICM, RND) I most wanted to redo.
+
+### a note on how it was built
+
+I built this with an AI agent as **co-builder**, and myself as the **architect**. That split is
+the honest description, and it's the point: an agent can write a learner fast, but it can't
+*decide the shape*. The one design decision the whole codebase pivots on — on-policy vs.
+off-policy as **data, not branching**, the curiosity models reusing the PPO policy, a new
+algorithm arriving as a registered learner rather than a new loop — was mine to make and mine to
+defend. The architecture is where the understanding lives, and you can read it straight off the
+code.
+
+Which is the thing I didn't expect to come away with. The barrier to building something hard
+used to be raw implementation skill. Increasingly it's **architectural taste** — knowing what to
+build and whether it's right — and that's a barrier far more people can now cross. Learning, and
+building, is democratising. This series is one small proof.
