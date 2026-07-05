@@ -1,0 +1,5 @@
+# Social media links / usernames. Displayed in the order defined here.
+# Docs: https://github.com/george-gca/jekyll-socials
+github_username: M-RR-J # your GitHub username
+# email: you@example.com  # TODO: uncomment + set if you want a public email link
+rss_icon: true # comment this line to hide the RSS icon
