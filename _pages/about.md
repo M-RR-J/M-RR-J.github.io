@@ -6,12 +6,9 @@ subtitle:
 
 profile:
   align: right
-  image: # the Mario clip below stands in for a static photo
+  image: # no hero image for now (Mario clip removed — didn't look good yet)
   image_circular: false
-  more_info: >
-    <img src="/assets/img/mario/mario-1-1.gif" alt="A PPO agent playing Super Mario Bros World 1-1"
-         style="width:100%; border-radius:8px;" />
-    <p style="text-align:center; font-size:0.8em; margin-top:0.4em;">PPO (13.5M steps) playing Super Mario Bros 1-1.</p>
+  more_info:
 
 selected_papers: false # includes a list of papers marked as "selected={true}"
 social: true # includes social icons at the bottom of the page
