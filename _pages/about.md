@@ -6,12 +6,12 @@ subtitle: Reinforcement learning · self-supervised representation learning · t
 
 profile:
   align: right
-  image: # no static photo — the Mario clip below stands in for it
+  image: # no static photo — the training curve below stands in for it
   image_circular: false
   more_info: >
-    <img src="/assets/img/mario/ppo.gif" alt="A PPO agent playing Super Mario Bros World 1-1"
+    <img src="/assets/img/blog/curves/dqn_vs_ppo.png" alt="DQN vs PPO sample-efficiency on Super Mario Bros"
          style="width:100%; border-radius:8px;" />
-    <p style="text-align:center; font-size:0.8em; margin-top:0.4em;">A PPO agent I trained, playing Mario 1-1</p>
+    <p style="text-align:center; font-size:0.8em; margin-top:0.4em;">DQN vs PPO on Mario 1-1 — sample efficiency.</p>
 
 selected_papers: false # includes a list of papers marked as "selected={true}"
 social: true # includes social icons at the bottom of the page
@@ -30,9 +30,12 @@ latest_posts:
 **I build agentic-AI systems professionally; on my own time I implement reinforcement
 learning from scratch to understand *why* it works — then write up what I learn.**
 
-Most of what's here started as a single confused question ("is RND an extension of
-ICM?") and turned into a chain of implemented models, matched experiments, and the
-occasional honest negative result.
+This started as a way to actually build the ideas I first met in a self-supervised-learning
+seminar at Mila, during my master's in Montréal. Back then my Python wasn't up to it — I could
+follow the papers but not run them. So I set out to build a small RL *factory*: infrastructure
+clean enough to reproduce those papers for real, starting with the curiosity work (ICM, RND) I
+most wanted to redo. Now the factory is my vehicle for testing research ideas — implement the
+paper, run the matched experiment, keep the honest negative results.
 
 The through-line is **exploration and representation**: teaching an agent to be curious
 (ICM, RND, episodic novelty), then asking the deeper question of *what space* novelty
