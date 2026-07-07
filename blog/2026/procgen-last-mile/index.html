@@ -1,0 +1,162 @@
+<!DOCTYPE html> <html lang="en"> <head> <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"> <meta charset="utf-8"> <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"> <meta http-equiv="X-UA-Compatible" content="IE=edge"> <title> The last mile was a compiler flag: getting Procgen to build on Apple Silicon | Maxime Jousset </title> <meta name="author" content="Maxime Jousset"> <meta name="description" content="Why I moved the RL work from Mario to Procgen — and why the first step was fixing a four-year-old build bug in the benchmark itself, then upstreaming the patch."> <meta name="keywords" content="reinforcement learning, deep RL, PPO, DQN, curiosity, exploration, representation learning, PyTorch, Maxime Jousset"> <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; media-src 'self' https:; frame-src 'self' https:; connect-src 'self' https:;"> <style>
+  :root {
+    --max-content-width: 930px;
+  }
+</style> <link rel="stylesheet" href="/assets/css/tailwind.css?v=50c64c15cbb9fd1ce6056fdb8bcb4b62"> <link defer rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.2.0/css/all.min.css" integrity="sha256-MVopmdyC2tYTiJ8wlktf0uh0v4NgT+vNdyVFepi7Q0c=" crossorigin="anonymous"> <link defer rel="stylesheet" href="https://cdn.jsdelivr.net/npm/academicons@1.9.5/css/academicons.min.css" integrity="sha256-SzrCOBJbGVFMahewkgjwnApaV2+av1DwMAA+/QGLyZw=" crossorigin="anonymous"> <link defer rel="stylesheet" href="https://cdn.jsdelivr.net/npm/scholar-icons@1.0.3/css/scholar-icons.css" integrity="sha256-VY3hHVj/hNX3fYG6wtbA6TcKJQl7+FthzGSyIB64klY=" crossorigin="anonymous"> <link defer rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Roboto+Slab:100,300,400,500,700|Material+Icons&amp;display=swap"> <link defer rel="stylesheet" href="/assets/css/jekyll-pygments-themes-github.css?v=591dab5a4e56573bf4ef7fd332894c99" media="" id="highlight_theme_light"> <link rel="shortcut icon" href="data:image/svg+xml,&lt;svg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20100%20100%22&gt;&lt;text%20y=%22.9em%22%20font-size=%2290%22&gt;%E2%9A%9B%EF%B8%8F&lt;/text&gt;&lt;/svg&gt;"> <link rel="stylesheet" href="/assets/css/main.css?v=f0b101217084a90093badfe99ff9a7d1"> <link rel="canonical" href="https://m-rr-j.github.io/blog/2026/procgen-last-mile/"> <script src="/assets/js/theme.js?v=7af685e2ba20b37fef545c97b8064050"></script> <link defer rel="stylesheet" href="/assets/css/jekyll-pygments-themes-native.css?v=5847e5ed4a4568527aa6cfab446049ca" media="none" id="highlight_theme_dark"> <script>
+    initTheme();
+  </script> </head> <body class="fixed-top-nav "> <header> <nav id="navbar" class="navbar navbar-light navbar-expand-sm fixed-top" role="navigation"> <div class="container"> <a class="navbar-brand title font-weight-lighter" href="/"> <span class="font-weight-bold">Maxime</span> Jousset </a> <button class="navbar-toggler collapsed navbar-toggler-main" type="button" data-nav-toggle="navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation"> <span class="sr-only">Toggle navigation</span> <span class="icon-bar top-bar"></span> <span class="icon-bar middle-bar"></span> <span class="icon-bar bottom-bar"></span> </button> <div class="collapse navbar-collapse navbar-collapse-main" id="navbarNav"> <ul class="navbar-nav navbar-menu-list flex-nowrap"> <li class="nav-item "> <a class="nav-link" href="/">about </a> </li> <li class="nav-item active"> <a class="nav-link" href="/blog/">blog </a> </li> <li class="nav-item"> <button id="search-toggle" type="button" title="Search" aria-label="Open search"> <span class="nav-link">ctrl k <i class="fa-solid fa-magnifying-glass"></i></span> </button> </li> <li class="toggle-container"> <button id="light-toggle" type="button" title="Change theme" aria-label="Change color theme"> <i class="fa-half-sun-moon" id="light-toggle-system"></i> <i class="fa-solid fa-moon" id="light-toggle-dark"></i> <i class="fa-solid fa-sun" id="light-toggle-light"></i> </button> </li> </ul> </div> </div> </nav> <progress id="progress" value="0"> <div class="progress-container"> <span class="progress-bar"></span> </div> </progress> </header> <div class="container mt-5" role="main"> <div class="post"> <header class="post-header"> <h1 class="post-title">The last mile was a compiler flag: getting Procgen to build on Apple Silicon</h1> <p class="post-tags"> <a href="/blog/tag/procgen"> <i class="fa-solid fa-hashtag fa-sm"></i> procgen</a>   <a href="/blog/tag/generalization"> <i class="fa-solid fa-hashtag fa-sm"></i> generalization</a>   <a href="/blog/tag/open-source"> <i class="fa-solid fa-hashtag fa-sm"></i> open-source</a>   <a href="/blog/tag/apple-silicon"> <i class="fa-solid fa-hashtag fa-sm"></i> apple-silicon</a>   ·   <a href="/blog/category/rl-from-scratch"> <i class="fa-solid fa-tag fa-sm"></i> rl-from-scratch</a> </p> </header> <article class="post-content"> <div id="markdown-content"> <p>The benchmark everyone recommends wouldn’t install on my laptop. This is the short story of why I switched the RL work from Super Mario Bros to <a href="https://github.com/openai/procgen" rel="external nofollow noopener" target="_blank">Procgen</a>, what stood in the way, and the <em>last mile</em> it took to get past it — the part where you either fix the tool for real and give the fix back, or quietly work around it and move on.</p> <p>I fixed it. And to be upfront about how I work now: I did it <strong>pairing with an AI coding agent</strong> (Claude Code) — I drove the diagnosis and the decisions, it accelerated the grind. That collaboration <em>is</em> part of the story.</p> <hr> <h2 id="why-leave-mario-at-all">Why leave Mario at all?</h2> <p>Short version: Mario 1-1 is a <strong>single hand-built level</strong>, so you can’t separate <em>learning</em> from <em>memorizing</em>, and it runs on an emulator that caps how many environments you can parallelize. <a href="https://arxiv.org/abs/1912.01588" rel="external nofollow noopener" target="_blank">Procgen</a> fixes both — procedurally-generated levels with a real train/test split, batched natively in one process. I unpack all of that in the previous post, <a href="/blog/2026/mario-vs-procgen/">From Mario to Procgen</a>. This post is about the wall I hit <em>getting there</em>.</p> <h2 id="the-wall">The wall</h2> <p>There’s no prebuilt Procgen wheel for Apple Silicon, so <code class="language-plaintext highlighter-rouge">pip</code> tries to build from source — and on an M1 that build simply fails. Three separate root causes, none of them obvious from the error spew:</p> <ol> <li> <strong>An x86-only compiler flag.</strong> Procgen’s <code class="language-plaintext highlighter-rouge">CMakeLists.txt</code> compiles packaged builds with <code class="language-plaintext highlighter-rouge">-march=ivybridge</code> — an <em>Intel</em> microarchitecture. arm64 Clang rejects it outright. (The fix: on <code class="language-plaintext highlighter-rouge">arm64</code>/<code class="language-plaintext highlighter-rouge">aarch64</code>, use the base <code class="language-plaintext highlighter-rouge">armv8-a</code> ISA instead.)</li> <li> <strong>Qt looked for at the wrong address.</strong> The build probes one hardcoded path for Qt — <code class="language-plaintext highlighter-rouge">/usr/local/opt/qt5</code>, the <em>Intel</em> Homebrew location. Apple Silicon Homebrew installs under <code class="language-plaintext highlighter-rouge">/opt/homebrew</code>, so CMake never finds it. (The fix: also probe <code class="language-plaintext highlighter-rouge">/opt/homebrew/opt/qt@5/lib/cmake</code>.)</li> <li> <strong>Warnings that became errors.</strong> Modern AppleClang (21) promotes two “set-but-unused variable” warnings in <code class="language-plaintext highlighter-rouge">starpilot.cpp</code> and <code class="language-plaintext highlighter-rouge">chaser.cpp</code> to hard errors under <code class="language-plaintext highlighter-rouge">-Werror</code>. (The fix: mark the two locals <code class="language-plaintext highlighter-rouge">[[maybe_unused]]</code> — zero change to any game logic.)</li> </ol> <p>None of these is deep. All three are the kind of paper cut that makes a person give up: buy a cloud box, switch benchmarks, or paste a hack into their local copy and never speak of it again.</p> <h2 id="the-last-mile">The last mile</h2> <p>Here’s the part I actually care about. A local hack would have unblocked <em>me</em> in ten minutes. Instead:</p> <ul> <li>I traced each failure to its <strong>root cause</strong> rather than silencing symptoms.</li> <li>The fix is <strong>four files, +15/−5 lines, behavior-preserving</strong> — the smallest change that restores the source build without touching a single game’s determinism.</li> <li>I <strong>upstreamed it</strong> as a pull request to <code class="language-plaintext highlighter-rouge">openai/procgen</code> — and it turned out to close <a href="https://github.com/openai/procgen/issues/69" rel="external nofollow noopener" target="_blank">issue #69, “Apple Silicon Support,”</a> which had been open since <strong>2021</strong> with a string of people hitting the same wall. So the fix doesn’t just help me; it helps everyone who tries Procgen on a Mac next.</li> <li>Then I <strong>proved it holds under load</strong> — not a 50-step smoke test, but a full <strong>100M-step</strong> PPO run (IMPALA-CNN, 64 environments batched natively, training on Metal/MPS) plus an off-policy world-model experiment on top. Stable start to finish.</li> </ul> <blockquote> <p><strong>PR:</strong> <a href="https://github.com/openai/procgen/pull/107" rel="external nofollow noopener" target="_blank">openai/procgen#107</a> — <em>Fix building from source on Apple Silicon (arm64) and recent Clang.</em> My first open-source contribution.</p> </blockquote> <p>That’s the difference between “I tried Procgen and it didn’t work” and “Procgen works on Apple Silicon now, for everyone, because I fixed it.” The distance between those two sentences is the last mile.</p> <h2 id="the-payoff">The payoff</h2> <p>With the build working, the question that justified the whole detour became answerable. Trained on 200 Miner levels and evaluated on the unseen full distribution:</p> <table> <thead> <tr> <th> </th> <th>mean return</th> <th>solve rate</th> </tr> </thead> <tbody> <tr> <td> <strong>Train</strong> (200 seen levels)</td> <td>10.63</td> <td>99%</td> </tr> <tr> <td> <strong>Test</strong> (unseen levels)</td> <td>7.78</td> <td>91%</td> </tr> </tbody> </table> <p>The agent genuinely learned to play — 91% solved on levels it had <em>never seen</em> — but there’s a real <strong>27% generalization gap</strong> it still leaves on the table. That gap is the entire point: a single, honest number that Mario could never have shown me, and the starting line for the representation and transfer experiments this project is actually about.</p> <p>The compiler flag was never the interesting part. Refusing to route around it was.</p> </div> </article> <br> <hr> <br> <h2 class="text-3xl font-semibold mb-4 mt-12">Enjoy Reading This Article?</h2> <p class="mb-2">Here are some more articles you might like to read next:</p> <ul class="list-disc pl-7 my-3 space-y-2 marker:text-[var(--global-theme-color)]"> <li class="leading-relaxed"> <a class="underline decoration-1 hover:text-[var(--global-hover-color)]" href="/blog/2026/mario-vs-procgen/">From Mario to Procgen: preprocessing, the emulator tax, and generalization</a> </li> <li class="leading-relaxed"> <a class="underline decoration-1 hover:text-[var(--global-hover-color)]" href="/blog/2026/knn/">kNN episodic novelty: the count that can't saturate</a> </li> <li class="leading-relaxed"> <a class="underline decoration-1 hover:text-[var(--global-hover-color)]" href="/blog/2026/rnd/">RND: a simpler curiosity, and why simpler won</a> </li> <li class="leading-relaxed"> <a class="underline decoration-1 hover:text-[var(--global-hover-color)]" href="/blog/2026/icm/">ICM: giving Mario curiosity (and the bug that ate it)</a> </li> <li class="leading-relaxed"> <a class="underline decoration-1 hover:text-[var(--global-hover-color)]" href="/blog/2026/ppo/">PPO: on-policy policy gradients that climb past DQN's ceiling</a> </li> <li class="leading-relaxed"> <a class="underline decoration-1 hover:text-[var(--global-hover-color)]" href="/blog/2026/dqn/">DQN: value learning that beats the floor (and then hits a ceiling)</a> </li> <li class="leading-relaxed"> <a class="underline decoration-1 hover:text-[var(--global-hover-color)]" href="/blog/2026/rl-factory/">rl-factory: an RL codebase where a new algorithm is a plug-in, not a rewrite</a> </li> </ul> </div> </div> <footer class="fixed-bottom" role="contentinfo"> <div class="container mt-0"> © Copyright 2026 Maxime Jousset. Powered by <a href="https://jekyllrb.com/" target="_blank" rel="external nofollow noopener">Jekyll</a> with <a href="https://github.com/alshedivat/al-folio" rel="external nofollow noopener" target="_blank">al-folio</a> theme. Hosted by <a href="https://pages.github.com/" target="_blank" rel="external nofollow noopener">GitHub Pages</a>. Photos from <a href="https://unsplash.com" target="_blank" rel="external nofollow noopener">Unsplash</a>. </div> </footer> <script>
+  window.alFolio = {
+    compatBootstrap: false
+  };
+</script> <script src="/assets/js/nav-toggle.js?v=141bd79a73ebc0f0b6ea58e440ae79fc"></script> <script defer src="https://cdn.jsdelivr.net/npm/masonry-layout@4.2.2/dist/masonry.pkgd.min.js" integrity="sha256-Nn1q/fx0H7SNLZMQ5Hw5JLaTRZp0yILA/FRexe19VdI=" crossorigin="anonymous"></script> <script defer src="https://cdn.jsdelivr.net/npm/imagesloaded@5.0.0/imagesloaded.pkgd.min.js" integrity="sha256-htrLFfZJ6v5udOG+3kNLINIKh2gvoKqwEhHYfTTMICc=" crossorigin="anonymous"></script> <script defer src="/assets/js/masonry.js?v=e49affc7bd2646f6acdad1dbe02c2359" type="text/javascript"></script> <script defer type="text/javascript" id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js" integrity="sha256-MASABpB4tYktI2Oitl4t+78w/lyA+D7b/s9GEP0JOGI=" crossorigin="anonymous"></script> <script src="/assets/al_math/js/mathjax-setup.js"></script> <script defer src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6" crossorigin="anonymous"></script> <script src="/assets/js/tooltips-setup.js?v=fe487e99db6c43751e6e7bdb2d6a0611"></script> <script src="/assets/js/no_defer.js?v=53b1b1a645525975c963ce8bf8bfefcf"></script> <script defer src="/assets/js/common.js?v=87baac90f765f2f3362dcf6aaf312a8a"></script> <script defer src="/assets/js/copy_code.js?v=c8a01c11a92744d44b093fc3bda915df" type="text/javascript"></script> <script defer src="/assets/js/jupyter_new_tab.js?v=896d254890d9b47f0281f63bfccf0dee"></script> <script async src="https://d1bxh8uas1mnw7.cloudfront.net/assets/embed.js"></script> <script async src="https://badge.dimensions.ai/badge.js"></script> <script defer src="https://cdn.jsdelivr.net/npm/medium-zoom@1.1.0/dist/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous"></script> <script defer src="/assets/al_img_tools/js/zoom.js"></script> <script defer src="/assets/js/progress-bar.js?v=499464c5c63ced6cf7ad62509f1e2610" type="text/javascript"></script> <script src="https://cdn.jsdelivr.net/npm/vanilla-back-to-top@7.2.1/dist/vanilla-back-to-top.min.js" integrity="sha256-uMJJ3EoTyfRBoTbR+lrfu1uRQ87RZG8AR3cVNuQVeFg=" crossorigin="anonymous"></script> <script>
+    addBackToTop();
+  </script> <script type="module" src="/assets/al_search/js/search/ninja-keys.min.js"></script> <ninja-keys hidebreadcrumbs noautoloadmdicons placeholder="Type to start searching"></ninja-keys> <script src="/assets/al_search/js/search-setup.js"></script> <script>
+// get the ninja-keys element
+const ninja = document.querySelector('ninja-keys');
+
+// add the home and posts menu items
+ninja.data = [{
+    id: "nav-about",
+    title: "about",
+    section: "Navigation",
+    handler: () => {
+      window.location.href = "/";
+    },
+  },{id: "nav-blog",
+          title: "blog",
+          description: "",
+          section: "Navigation",
+          handler: () => {
+            window.location.href = "/blog/";
+          },
+        },{id: "post-the-last-mile-was-a-compiler-flag-getting-procgen-to-build-on-apple-silicon",
+        
+          title: "The last mile was a compiler flag: getting Procgen to build on Apple...",
+        
+        description: "Why I moved the RL work from Mario to Procgen — and why the first step was fixing a four-year-old build bug in the benchmark itself, then upstreaming the patch.",
+        section: "Posts",
+        handler: () => {
+          
+            window.location.href = "/blog/2026/procgen-last-mile/";
+          
+        },
+      },{id: "post-from-mario-to-procgen-preprocessing-the-emulator-tax-and-generalization",
+        
+          title: "From Mario to Procgen: preprocessing, the emulator tax, and generalization",
+        
+        description: "Three concrete reasons I moved the RL work from Super Mario Bros to Procgen — the preprocessing you don&#39;t have to write, the environments you can finally parallelize, and the generalization test Mario can&#39;t give you.",
+        section: "Posts",
+        handler: () => {
+          
+            window.location.href = "/blog/2026/mario-vs-procgen/";
+          
+        },
+      },{id: "post-knn-episodic-novelty-the-count-that-can-39-t-saturate",
+        
+          title: "kNN episodic novelty: the count that can&#39;t saturate",
+        
+        description: "A count-based novelty signal that structurally cannot die the way distillation did — because every episode starts from an empty memory.",
+        section: "Posts",
+        handler: () => {
+          
+            window.location.href = "/blog/2026/knn/";
+          
+        },
+      },{id: "post-rnd-a-simpler-curiosity-and-why-simpler-won",
+        
+          title: "RND: a simpler curiosity, and why simpler won",
+        
+        description: "ICM asks a dynamics question, RND a visitation question — and on Mario the simpler visitation signal held up where a prediction-on-features variant collapsed.",
+        section: "Posts",
+        handler: () => {
+          
+            window.location.href = "/blog/2026/rnd/";
+          
+        },
+      },{id: "post-icm-giving-mario-curiosity-and-the-bug-that-ate-it",
+        
+          title: "ICM: giving Mario curiosity (and the bug that ate it)",
+        
+        description: "Bolting an Intrinsic Curiosity Module onto PPO as just a new learner — and the real bug where the curiosity signal silently collapsed to zero.",
+        section: "Posts",
+        handler: () => {
+          
+            window.location.href = "/blog/2026/icm/";
+          
+        },
+      },{id: "post-ppo-on-policy-policy-gradients-that-climb-past-dqn-39-s-ceiling",
+        
+          title: "PPO: on-policy policy gradients that climb past DQN&#39;s ceiling",
+        
+        description: "From REINFORCE through A2C to PPO — the on-policy learner that optimizes the policy directly and overtakes DQN on Mario 1-1.",
+        section: "Posts",
+        handler: () => {
+          
+            window.location.href = "/blog/2026/ppo/";
+          
+        },
+      },{id: "post-dqn-value-learning-that-beats-the-floor-and-then-hits-a-ceiling",
+        
+          title: "DQN: value learning that beats the floor (and then hits a ceiling)",
+        
+        description: "The first learning agent — a Nature-DQN Q-network with replay and a frozen target network — dropped into the off-policy half of rl-factory. It beats the random baseline on Mario 1-1, then plateaus.",
+        section: "Posts",
+        handler: () => {
+          
+            window.location.href = "/blog/2026/dqn/";
+          
+        },
+      },{id: "post-rl-factory-an-rl-codebase-where-a-new-algorithm-is-a-plug-in-not-a-rewrite",
+        
+          title: "rl-factory: an RL codebase where a new algorithm is a plug-in, not a...",
+        
+        description: "The lean spine that lets DQN, PPO, ICM, RND, and kNN-novelty share one training loop — where adding a model means registering a learner, not branching the control flow.",
+        section: "Posts",
+        handler: () => {
+          
+            window.location.href = "/blog/2026/rl-factory/";
+          
+        },
+      },{
+        id: 'social-github',
+        title: 'GitHub',
+        section: 'Socials',
+        handler: () => {
+          window.open("https://github.com/M-RR-J", "_blank");
+        },
+      },{
+        id: 'social-rss',
+        title: 'RSS Feed',
+        section: 'Socials',
+        handler: () => {
+          window.open("/feed.xml", "_blank");
+        },
+      },{
+      id: 'light-theme',
+      title: 'Change theme to light',
+      description: 'Change the theme of the site to Light',
+      section: 'Theme',
+      handler: () => {
+        setThemeSetting("light");
+      },
+    },
+    {
+      id: 'dark-theme',
+      title: 'Change theme to dark',
+      description: 'Change the theme of the site to Dark',
+      section: 'Theme',
+      handler: () => {
+        setThemeSetting("dark");
+      },
+    },
+    {
+      id: 'system-theme',
+      title: 'Use system default theme',
+      description: 'Change the theme of the site to System Default',
+      section: 'Theme',
+      handler: () => {
+        setThemeSetting("system");
+      },
+    },];
+
+</script> <script src="/assets/al_search/js/shortcut-key.js"></script> </body> </html>

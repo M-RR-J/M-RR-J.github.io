@@ -1,0 +1,162 @@
+<!DOCTYPE html> <html lang="en"> <head> <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"> <meta charset="utf-8"> <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"> <meta http-equiv="X-UA-Compatible" content="IE=edge"> <title> From Mario to Procgen: preprocessing, the emulator tax, and generalization | Maxime Jousset </title> <meta name="author" content="Maxime Jousset"> <meta name="description" content="Three concrete reasons I moved the RL work from Super Mario Bros to Procgen — the preprocessing you don't have to write, the environments you can finally parallelize, and the generalization test Mario can't give you."> <meta name="keywords" content="reinforcement learning, deep RL, PPO, DQN, curiosity, exploration, representation learning, PyTorch, Maxime Jousset"> <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; media-src 'self' https:; frame-src 'self' https:; connect-src 'self' https:;"> <style>
+  :root {
+    --max-content-width: 930px;
+  }
+</style> <link rel="stylesheet" href="/assets/css/tailwind.css?v=50c64c15cbb9fd1ce6056fdb8bcb4b62"> <link defer rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.2.0/css/all.min.css" integrity="sha256-MVopmdyC2tYTiJ8wlktf0uh0v4NgT+vNdyVFepi7Q0c=" crossorigin="anonymous"> <link defer rel="stylesheet" href="https://cdn.jsdelivr.net/npm/academicons@1.9.5/css/academicons.min.css" integrity="sha256-SzrCOBJbGVFMahewkgjwnApaV2+av1DwMAA+/QGLyZw=" crossorigin="anonymous"> <link defer rel="stylesheet" href="https://cdn.jsdelivr.net/npm/scholar-icons@1.0.3/css/scholar-icons.css" integrity="sha256-VY3hHVj/hNX3fYG6wtbA6TcKJQl7+FthzGSyIB64klY=" crossorigin="anonymous"> <link defer rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Roboto+Slab:100,300,400,500,700|Material+Icons&amp;display=swap"> <link defer rel="stylesheet" href="/assets/css/jekyll-pygments-themes-github.css?v=591dab5a4e56573bf4ef7fd332894c99" media="" id="highlight_theme_light"> <link rel="shortcut icon" href="data:image/svg+xml,&lt;svg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20100%20100%22&gt;&lt;text%20y=%22.9em%22%20font-size=%2290%22&gt;%E2%9A%9B%EF%B8%8F&lt;/text&gt;&lt;/svg&gt;"> <link rel="stylesheet" href="/assets/css/main.css?v=f0b101217084a90093badfe99ff9a7d1"> <link rel="canonical" href="https://m-rr-j.github.io/blog/2026/mario-vs-procgen/"> <script src="/assets/js/theme.js?v=7af685e2ba20b37fef545c97b8064050"></script> <link defer rel="stylesheet" href="/assets/css/jekyll-pygments-themes-native.css?v=5847e5ed4a4568527aa6cfab446049ca" media="none" id="highlight_theme_dark"> <script>
+    initTheme();
+  </script> </head> <body class="fixed-top-nav "> <header> <nav id="navbar" class="navbar navbar-light navbar-expand-sm fixed-top" role="navigation"> <div class="container"> <a class="navbar-brand title font-weight-lighter" href="/"> <span class="font-weight-bold">Maxime</span> Jousset </a> <button class="navbar-toggler collapsed navbar-toggler-main" type="button" data-nav-toggle="navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation"> <span class="sr-only">Toggle navigation</span> <span class="icon-bar top-bar"></span> <span class="icon-bar middle-bar"></span> <span class="icon-bar bottom-bar"></span> </button> <div class="collapse navbar-collapse navbar-collapse-main" id="navbarNav"> <ul class="navbar-nav navbar-menu-list flex-nowrap"> <li class="nav-item "> <a class="nav-link" href="/">about </a> </li> <li class="nav-item active"> <a class="nav-link" href="/blog/">blog </a> </li> <li class="nav-item"> <button id="search-toggle" type="button" title="Search" aria-label="Open search"> <span class="nav-link">ctrl k <i class="fa-solid fa-magnifying-glass"></i></span> </button> </li> <li class="toggle-container"> <button id="light-toggle" type="button" title="Change theme" aria-label="Change color theme"> <i class="fa-half-sun-moon" id="light-toggle-system"></i> <i class="fa-solid fa-moon" id="light-toggle-dark"></i> <i class="fa-solid fa-sun" id="light-toggle-light"></i> </button> </li> </ul> </div> </div> </nav> <progress id="progress" value="0"> <div class="progress-container"> <span class="progress-bar"></span> </div> </progress> </header> <div class="container mt-5" role="main"> <div class="post"> <header class="post-header"> <h1 class="post-title">From Mario to Procgen: preprocessing, the emulator tax, and generalization</h1> <p class="post-tags"> <a href="/blog/tag/procgen"> <i class="fa-solid fa-hashtag fa-sm"></i> procgen</a>   <a href="/blog/tag/mario"> <i class="fa-solid fa-hashtag fa-sm"></i> mario</a>   <a href="/blog/tag/environments"> <i class="fa-solid fa-hashtag fa-sm"></i> environments</a>   <a href="/blog/tag/generalization"> <i class="fa-solid fa-hashtag fa-sm"></i> generalization</a>   ·   <a href="/blog/category/rl-from-scratch"> <i class="fa-solid fa-tag fa-sm"></i> rl-from-scratch</a> </p> </header> <article class="post-content"> <div id="markdown-content"> <p>After the curiosity posts, I moved the reinforcement-learning work off <strong>Super Mario Bros</strong> and onto <strong><a href="https://openai.com/index/procgen-benchmark/" rel="external nofollow noopener" target="_blank">Procgen</a></strong>. This tutorial is the <em>why</em>, from first principles — because the <strong>environment</strong> you pick decides both <em>what you can measure</em> and <em>how fast you can measure it</em>, often more than the algorithm does. Two goals drove the switch:</p> <ol> <li> <strong>Stop being CPU-bound</strong> — a genuine waste in deep RL, and</li> <li><strong>Be able to test generalization at all.</strong></li> </ol> <p>If you remember one sentence: <strong>Mario is one hand-built level behind an emulator; Procgen is a factory of levels running natively in one process — and that difference is preprocessing you don’t write, environments you can actually parallelize, and a generalization test you couldn’t run before.</strong></p> <figure> <picture> <source class="responsive-img-srcset" srcset="/assets/img/blog/envs/what_the_agent_sees-480.webp 480w,/assets/img/blog/envs/what_the_agent_sees-800.webp 800w,/assets/img/blog/envs/what_the_agent_sees-1400.webp 1400w," type="image/webp" sizes="95vw"></source> <img src="/assets/img/blog/envs/what_the_agent_sees.png" class="img-fluid rounded z-depth-1" width="100%" height="auto" data-zoomable="" loading="eager" onerror="this.onerror=null; document.querySelectorAll('.responsive-img-srcset').forEach(function (n) { n.remove(); });"> </picture> </figure> <p><em>What each agent actually sees. Mario’s rich 240×256 frame gets reduced to an 84×84 grayscale stack before the network touches it; Procgen’s 64×64 frame is fed in as-is.</em></p> <p>Every new term is defined the first time it appears.</p> <hr> <h2 id="part-0--what-an-environment-gives-you">Part 0 — What an “environment” gives you</h2> <p>An RL <strong>environment</strong> is the world the agent acts in. Each step it takes an <strong>action</strong> and returns an <strong>observation</strong> (here: an image of the screen), a <strong>reward</strong>, and whether the episode ended. The agent never sees the game’s internal state — only pixels. So the <em>shape and cost of those pixels</em>, and <em>how many copies of the world you can run at once</em>, are first-order design facts. That’s what changes between Mario and Procgen.</p> <hr> <h2 id="part-1--preprocessing-the-frames-you-must-fix-vs-the-frames-you-dont">Part 1 — Preprocessing: the frames you must fix vs. the frames you don’t</h2> <p><strong>Mario hands you a raw NES frame: <code class="language-plaintext highlighter-rouge">(240, 256, 3)</code> RGB</strong>, at the console’s frame rate. You can’t feed that to a CNN as-is — three problems, three fixes, the standard Atari/DQN pipeline:</p> <ul> <li> <strong>Too big</strong> → <strong>resize</strong> to <code class="language-plaintext highlighter-rouge">84×84</code> (less compute per frame).</li> <li> <strong>Color is mostly decoration</strong> → <strong>grayscale</strong> (drop 3 channels to 1).</li> <li> <strong>A single frame isn’t Markov.</strong> From one still image you can’t tell if Mario is <em>rising or falling</em> — velocity is invisible. → <strong>stack the last 4 frames</strong> so the network can infer motion. And <strong>skip frames</strong>: repeat each chosen action for 4 game frames (cheaper, and one decision then maps to one meaningful change).</li> </ul> <blockquote> <p><strong>Markov:</strong> a state is Markov if it contains everything needed to predict the future — no memory of the past required. One Mario frame isn’t (no velocity); four stacked frames approximately are.</p> </blockquote> <p>So before the agent learns anything, you write and tune <strong>four wrappers</strong> (resize, grayscale, stack, skip) that turn <code class="language-plaintext highlighter-rouge">(240,256,3)</code> into <code class="language-plaintext highlighter-rouge">(4, 84, 84)</code>.</p> <p><strong>Procgen hands you <code class="language-plaintext highlighter-rouge">(64, 64, 3)</code> RGB — and you feed it straight to the CNN.</strong> No resize (already small), no grayscale (color is <em>semantic</em> here: keys, walls, and enemies are color-coded — graying it out destroys information), no stacking and no frame-skip (the games are designed to be ~fully observable from a single frame). The preprocessing you skip isn’t laziness — it’s the <em>standard</em>, so your results stay comparable to the published Procgen numbers.</p> <table> <thead> <tr> <th> </th> <th><strong>Mario</strong></th> <th><strong>Procgen</strong></th> </tr> </thead> <tbody> <tr> <td>Raw observation</td> <td> <code class="language-plaintext highlighter-rouge">(240, 256, 3)</code> RGB</td> <td> <code class="language-plaintext highlighter-rouge">(64, 64, 3)</code> RGB</td> </tr> <tr> <td>Resize</td> <td>needed → <code class="language-plaintext highlighter-rouge">84×84</code> </td> <td>none (already small)</td> </tr> <tr> <td>Grayscale</td> <td>yes (color irrelevant)</td> <td> <strong>no</strong> (color is semantic)</td> </tr> <tr> <td>Frame stacking</td> <td>4 (to see velocity)</td> <td> <strong>none</strong> (near-Markov single frame)</td> </tr> <tr> <td>Frame-skip</td> <td>4</td> <td>none</td> </tr> <tr> <td>What the net sees</td> <td><code class="language-plaintext highlighter-rouge">(4, 84, 84)</code></td> <td><code class="language-plaintext highlighter-rouge">(3, 64, 64)</code></td> </tr> </tbody> </table> <hr> <h2 id="part-2--the-emulator-tax-why-i-could-run-8-mario-envs-but-64-procgen-envs">Part 2 — The emulator tax: why I could run 8 Mario envs but 64 Procgen envs</h2> <p>RL is data-hungry, so you run <strong>many copies of the environment in parallel</strong> (a <strong>vectorized environment</strong>) to feed the network a big batch each step. <em>How</em> you parallelize depends entirely on what the environment <em>is</em>.</p> <p><strong>Mario runs on an NES emulator.</strong> Under the hood, <code class="language-plaintext highlighter-rouge">gym-super-mario-bros</code> drives <code class="language-plaintext highlighter-rouge">nes-py</code>, a program that <strong>simulates the console</strong> — a CPU-bound chunk of work, one instance per environment. To run many in parallel, “parallel” has to mean <strong>N separate operating-system processes</strong> (a <em>subprocess</em> vectorized env): each environment is its own process, and on every step you <strong>pickle</strong> the observation (a whole image) and push it through an OS <strong>pipe</strong> back to the learner.</p> <blockquote> <p><strong>IPC (inter-process communication):</strong> moving data between separate processes. Pickling an image and sending it over a pipe every step is pure overhead — it does no learning, it just <em>moves bytes</em>.</p> </blockquote> <p>That overhead is brutal: on my M1, roughly <strong>two-thirds of the CPU was spent in the kernel</strong> shuffling observations between processes, not stepping games or training. It also caps how many envs you can afford. <strong>I ran 8.</strong></p> <p><strong>Procgen is a native C++ environment that batches internally.</strong> <code class="language-plaintext highlighter-rouge">ProcgenGym3Env(num=64)</code> steps <strong>64 levels inside one process</strong>, writing all 64 observations straight into a single array — no per-env process, no pickling, no pipes. One call in, a batch out. I jumped straight to <strong>64 environments</strong> feeding one batched GPU forward pass, and throughput <strong>roughly tripled</strong>.</p> <p>Why care? Deep RL alternates two phases: <strong>step the environment (CPU)</strong> and <strong>run the network (GPU)</strong>. If env-stepping is slow, your expensive GPU <strong>sits idle waiting for data</strong> — you’re <em>CPU-bound</em>, paying for a GPU that twiddles its thumbs. The whole point of modern RL infra is to keep the GPU fed; an emulator-one-process-per-env starves it, a native batched env feeds it. <strong>Changing the environment did more for my throughput than any code optimization could.</strong></p> <hr> <h2 id="part-3--train-and-test-the-question-mario-cant-answer">Part 3 — Train and test: the question Mario can’t answer</h2> <p>Here’s the scientific reason, and it’s the big one.</p> <p><strong>Mario 1-1 is a single, fixed, hand-authored level.</strong> You train on it and evaluate on it — the <em>same</em> level. So when the agent finally clears it, you genuinely <strong>cannot tell</strong> whether it <em>learned to play</em> or <em>memorized this exact layout</em>. There is no held-out level to check against. (Mario has a “random-stages” mode, but it’s a small hand-made pool, not a real protocol.)</p> <p><strong>Procgen procedurally generates its levels from a seed.</strong> So you can train on a fixed set — say <strong>200 levels</strong> — and then <strong>test on levels the agent has never seen</strong> (the rest of an effectively infinite distribution).</p> <figure> <picture> <source class="responsive-img-srcset" srcset="/assets/img/blog/envs/procgen_levels_grid-480.webp 480w,/assets/img/blog/envs/procgen_levels_grid-800.webp 800w,/assets/img/blog/envs/procgen_levels_grid-1400.webp 1400w," type="image/webp" sizes="95vw"></source> <img src="/assets/img/blog/envs/procgen_levels_grid.png" class="img-fluid rounded z-depth-1" width="100%" height="auto" data-zoomable="" loading="eager" onerror="this.onerror=null; document.querySelectorAll('.responsive-img-srcset').forEach(function (n) { n.remove(); });"> </picture> </figure> <p><em>Nine CoinRun levels from nine different seeds — same rules, different layouts. Train on some, test on the rest, and the score difference tells you how much the agent actually learned versus memorized.</em></p> <blockquote> <p><strong>generalization gap:</strong> <em>train score − test score</em>. How much of the performance is transferable skill versus memorization of the specific training levels.</p> </blockquote> <p>That gap is a single, honest number, and Mario simply can’t produce it. Measuring generalization is the <em>entire reason</em> Procgen exists (<a href="https://arxiv.org/abs/1912.01588" rel="external nofollow noopener" target="_blank">Cobbe et al., 2020</a>). It’s what turns “my agent got good at the game” into “my agent learned something that <em>transfers</em>” — which is the question the rest of this project is actually about.</p> <hr> <h2 id="so-two-goals-one-environment-change">So: two goals, one environment change</h2> <ul> <li> <strong>Not CPU-bound</strong> — native in-process batching took me from 8 → 64 environments and kept the GPU fed instead of idling behind an emulator.</li> <li> <strong>Test generalization</strong> — a train/test split over procedurally-generated levels gives a real generalization gap, which a single fixed level never could.</li> </ul> <p>There was one catch: none of this mattered until Procgen actually <em>built</em> on my Apple-Silicon laptop — which, out of the box, it didn’t. Getting past that was its own small adventure in refusing to route around a broken build. That’s the next post: <a href="/blog/2026/procgen-last-mile/">the last mile of fixing Procgen on Apple Silicon</a>.</p> </div> </article> <br> <hr> <br> <h2 class="text-3xl font-semibold mb-4 mt-12">Enjoy Reading This Article?</h2> <p class="mb-2">Here are some more articles you might like to read next:</p> <ul class="list-disc pl-7 my-3 space-y-2 marker:text-[var(--global-theme-color)]"> <li class="leading-relaxed"> <a class="underline decoration-1 hover:text-[var(--global-hover-color)]" href="/blog/2026/procgen-last-mile/">The last mile was a compiler flag: getting Procgen to build on Apple Silicon</a> </li> <li class="leading-relaxed"> <a class="underline decoration-1 hover:text-[var(--global-hover-color)]" href="/blog/2026/knn/">kNN episodic novelty: the count that can't saturate</a> </li> <li class="leading-relaxed"> <a class="underline decoration-1 hover:text-[var(--global-hover-color)]" href="/blog/2026/rnd/">RND: a simpler curiosity, and why simpler won</a> </li> <li class="leading-relaxed"> <a class="underline decoration-1 hover:text-[var(--global-hover-color)]" href="/blog/2026/icm/">ICM: giving Mario curiosity (and the bug that ate it)</a> </li> <li class="leading-relaxed"> <a class="underline decoration-1 hover:text-[var(--global-hover-color)]" href="/blog/2026/ppo/">PPO: on-policy policy gradients that climb past DQN's ceiling</a> </li> <li class="leading-relaxed"> <a class="underline decoration-1 hover:text-[var(--global-hover-color)]" href="/blog/2026/dqn/">DQN: value learning that beats the floor (and then hits a ceiling)</a> </li> <li class="leading-relaxed"> <a class="underline decoration-1 hover:text-[var(--global-hover-color)]" href="/blog/2026/rl-factory/">rl-factory: an RL codebase where a new algorithm is a plug-in, not a rewrite</a> </li> </ul> </div> </div> <footer class="fixed-bottom" role="contentinfo"> <div class="container mt-0"> © Copyright 2026 Maxime Jousset. Powered by <a href="https://jekyllrb.com/" target="_blank" rel="external nofollow noopener">Jekyll</a> with <a href="https://github.com/alshedivat/al-folio" rel="external nofollow noopener" target="_blank">al-folio</a> theme. Hosted by <a href="https://pages.github.com/" target="_blank" rel="external nofollow noopener">GitHub Pages</a>. Photos from <a href="https://unsplash.com" target="_blank" rel="external nofollow noopener">Unsplash</a>. </div> </footer> <script>
+  window.alFolio = {
+    compatBootstrap: false
+  };
+</script> <script src="/assets/js/nav-toggle.js?v=141bd79a73ebc0f0b6ea58e440ae79fc"></script> <script defer src="https://cdn.jsdelivr.net/npm/masonry-layout@4.2.2/dist/masonry.pkgd.min.js" integrity="sha256-Nn1q/fx0H7SNLZMQ5Hw5JLaTRZp0yILA/FRexe19VdI=" crossorigin="anonymous"></script> <script defer src="https://cdn.jsdelivr.net/npm/imagesloaded@5.0.0/imagesloaded.pkgd.min.js" integrity="sha256-htrLFfZJ6v5udOG+3kNLINIKh2gvoKqwEhHYfTTMICc=" crossorigin="anonymous"></script> <script defer src="/assets/js/masonry.js?v=e49affc7bd2646f6acdad1dbe02c2359" type="text/javascript"></script> <script defer type="text/javascript" id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js" integrity="sha256-MASABpB4tYktI2Oitl4t+78w/lyA+D7b/s9GEP0JOGI=" crossorigin="anonymous"></script> <script src="/assets/al_math/js/mathjax-setup.js"></script> <script defer src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6" crossorigin="anonymous"></script> <script src="/assets/js/tooltips-setup.js?v=fe487e99db6c43751e6e7bdb2d6a0611"></script> <script src="/assets/js/no_defer.js?v=53b1b1a645525975c963ce8bf8bfefcf"></script> <script defer src="/assets/js/common.js?v=87baac90f765f2f3362dcf6aaf312a8a"></script> <script defer src="/assets/js/copy_code.js?v=c8a01c11a92744d44b093fc3bda915df" type="text/javascript"></script> <script defer src="/assets/js/jupyter_new_tab.js?v=896d254890d9b47f0281f63bfccf0dee"></script> <script async src="https://d1bxh8uas1mnw7.cloudfront.net/assets/embed.js"></script> <script async src="https://badge.dimensions.ai/badge.js"></script> <script defer src="https://cdn.jsdelivr.net/npm/medium-zoom@1.1.0/dist/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous"></script> <script defer src="/assets/al_img_tools/js/zoom.js"></script> <script defer src="/assets/js/progress-bar.js?v=499464c5c63ced6cf7ad62509f1e2610" type="text/javascript"></script> <script src="https://cdn.jsdelivr.net/npm/vanilla-back-to-top@7.2.1/dist/vanilla-back-to-top.min.js" integrity="sha256-uMJJ3EoTyfRBoTbR+lrfu1uRQ87RZG8AR3cVNuQVeFg=" crossorigin="anonymous"></script> <script>
+    addBackToTop();
+  </script> <script type="module" src="/assets/al_search/js/search/ninja-keys.min.js"></script> <ninja-keys hidebreadcrumbs noautoloadmdicons placeholder="Type to start searching"></ninja-keys> <script src="/assets/al_search/js/search-setup.js"></script> <script>
+// get the ninja-keys element
+const ninja = document.querySelector('ninja-keys');
+
+// add the home and posts menu items
+ninja.data = [{
+    id: "nav-about",
+    title: "about",
+    section: "Navigation",
+    handler: () => {
+      window.location.href = "/";
+    },
+  },{id: "nav-blog",
+          title: "blog",
+          description: "",
+          section: "Navigation",
+          handler: () => {
+            window.location.href = "/blog/";
+          },
+        },{id: "post-the-last-mile-was-a-compiler-flag-getting-procgen-to-build-on-apple-silicon",
+        
+          title: "The last mile was a compiler flag: getting Procgen to build on Apple...",
+        
+        description: "Why I moved the RL work from Mario to Procgen — and why the first step was fixing a four-year-old build bug in the benchmark itself, then upstreaming the patch.",
+        section: "Posts",
+        handler: () => {
+          
+            window.location.href = "/blog/2026/procgen-last-mile/";
+          
+        },
+      },{id: "post-from-mario-to-procgen-preprocessing-the-emulator-tax-and-generalization",
+        
+          title: "From Mario to Procgen: preprocessing, the emulator tax, and generalization",
+        
+        description: "Three concrete reasons I moved the RL work from Super Mario Bros to Procgen — the preprocessing you don&#39;t have to write, the environments you can finally parallelize, and the generalization test Mario can&#39;t give you.",
+        section: "Posts",
+        handler: () => {
+          
+            window.location.href = "/blog/2026/mario-vs-procgen/";
+          
+        },
+      },{id: "post-knn-episodic-novelty-the-count-that-can-39-t-saturate",
+        
+          title: "kNN episodic novelty: the count that can&#39;t saturate",
+        
+        description: "A count-based novelty signal that structurally cannot die the way distillation did — because every episode starts from an empty memory.",
+        section: "Posts",
+        handler: () => {
+          
+            window.location.href = "/blog/2026/knn/";
+          
+        },
+      },{id: "post-rnd-a-simpler-curiosity-and-why-simpler-won",
+        
+          title: "RND: a simpler curiosity, and why simpler won",
+        
+        description: "ICM asks a dynamics question, RND a visitation question — and on Mario the simpler visitation signal held up where a prediction-on-features variant collapsed.",
+        section: "Posts",
+        handler: () => {
+          
+            window.location.href = "/blog/2026/rnd/";
+          
+        },
+      },{id: "post-icm-giving-mario-curiosity-and-the-bug-that-ate-it",
+        
+          title: "ICM: giving Mario curiosity (and the bug that ate it)",
+        
+        description: "Bolting an Intrinsic Curiosity Module onto PPO as just a new learner — and the real bug where the curiosity signal silently collapsed to zero.",
+        section: "Posts",
+        handler: () => {
+          
+            window.location.href = "/blog/2026/icm/";
+          
+        },
+      },{id: "post-ppo-on-policy-policy-gradients-that-climb-past-dqn-39-s-ceiling",
+        
+          title: "PPO: on-policy policy gradients that climb past DQN&#39;s ceiling",
+        
+        description: "From REINFORCE through A2C to PPO — the on-policy learner that optimizes the policy directly and overtakes DQN on Mario 1-1.",
+        section: "Posts",
+        handler: () => {
+          
+            window.location.href = "/blog/2026/ppo/";
+          
+        },
+      },{id: "post-dqn-value-learning-that-beats-the-floor-and-then-hits-a-ceiling",
+        
+          title: "DQN: value learning that beats the floor (and then hits a ceiling)",
+        
+        description: "The first learning agent — a Nature-DQN Q-network with replay and a frozen target network — dropped into the off-policy half of rl-factory. It beats the random baseline on Mario 1-1, then plateaus.",
+        section: "Posts",
+        handler: () => {
+          
+            window.location.href = "/blog/2026/dqn/";
+          
+        },
+      },{id: "post-rl-factory-an-rl-codebase-where-a-new-algorithm-is-a-plug-in-not-a-rewrite",
+        
+          title: "rl-factory: an RL codebase where a new algorithm is a plug-in, not a...",
+        
+        description: "The lean spine that lets DQN, PPO, ICM, RND, and kNN-novelty share one training loop — where adding a model means registering a learner, not branching the control flow.",
+        section: "Posts",
+        handler: () => {
+          
+            window.location.href = "/blog/2026/rl-factory/";
+          
+        },
+      },{
+        id: 'social-github',
+        title: 'GitHub',
+        section: 'Socials',
+        handler: () => {
+          window.open("https://github.com/M-RR-J", "_blank");
+        },
+      },{
+        id: 'social-rss',
+        title: 'RSS Feed',
+        section: 'Socials',
+        handler: () => {
+          window.open("/feed.xml", "_blank");
+        },
+      },{
+      id: 'light-theme',
+      title: 'Change theme to light',
+      description: 'Change the theme of the site to Light',
+      section: 'Theme',
+      handler: () => {
+        setThemeSetting("light");
+      },
+    },
+    {
+      id: 'dark-theme',
+      title: 'Change theme to dark',
+      description: 'Change the theme of the site to Dark',
+      section: 'Theme',
+      handler: () => {
+        setThemeSetting("dark");
+      },
+    },
+    {
+      id: 'system-theme',
+      title: 'Use system default theme',
+      description: 'Change the theme of the site to System Default',
+      section: 'Theme',
+      handler: () => {
+        setThemeSetting("system");
+      },
+    },];
+
+</script> <script src="/assets/al_search/js/shortcut-key.js"></script> </body> </html>
